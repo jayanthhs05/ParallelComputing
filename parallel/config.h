@@ -1,0 +1,11 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define MAX_LINE_LENGTH 256
+#define NUM_FACTORS 50
+#define LEARNING_RATE 0.005
+#define REGULARIZATION 0.02
+#define NUM_ITERATIONS 20
+#define TRAIN_TEST_SPLIT 0.8
+
+#endif
