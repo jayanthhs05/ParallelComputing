@@ -27,6 +27,9 @@ typedef struct {
 typedef struct {
   float **user_features;
   float **movie_features;
+  float *user_bias;
+  float *movie_bias;
+  float global_mean;
   int num_users;
   int num_movies;
   int num_factors;

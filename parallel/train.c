@@ -7,7 +7,9 @@
 #include <stdlib.h>
 
 static float predict_rating(Model *model, int user_id, int movie_id) {
-  float prediction = 0.0;
+
+  float prediction = model->global_mean + model->user_bias[user_id] +
+                     model->movie_bias[movie_id];
 
   for (int k = 0; k < model->num_factors; k++) {
     prediction +=
@@ -60,6 +62,13 @@ void train_model_parallel(Model *model, Dataset *train_data, int num_iterations,
       float predicted_rating = predict_rating(model, user_id, movie_id);
       float error = actual_rating - predicted_rating;
 
+      model->user_bias[user_id] +=
+          model->learning_rate *
+          (error - model->regularization * model->user_bias[user_id]);
+      model->movie_bias[movie_id] +=
+          model->learning_rate *
+          (error - model->regularization * model->movie_bias[movie_id]);
+
       for (int k = 0; k < model->num_factors; k++) {
         float user_feature = model->user_features[user_id][k];
         float movie_feature = model->movie_features[movie_id][k];
@@ -94,6 +103,11 @@ void train_model_parallel(Model *model, Dataset *train_data, int num_iterations,
         }
       }
 
+      MPI_Allreduce(MPI_IN_PLACE, model->user_bias, model->num_users, MPI_FLOAT,
+                    MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(MPI_IN_PLACE, model->movie_bias, model->num_movies,
+                    MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+
       MPI_Allreduce(MPI_IN_PLACE, flat_user_features, user_feature_size,
                     MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
 
@@ -101,6 +115,13 @@ void train_model_parallel(Model *model, Dataset *train_data, int num_iterations,
                     MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
 
       float scale = 1.0f / size;
+
+      for (int i = 0; i < model->num_users; i++) {
+        model->user_bias[i] *= scale;
+      }
+      for (int i = 0; i < model->num_movies; i++) {
+        model->movie_bias[i] *= scale;
+      }
 
       for (int i = 0; i < model->num_users; i++) {
         int base_idx = i * model->num_factors;

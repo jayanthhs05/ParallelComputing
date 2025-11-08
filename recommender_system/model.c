@@ -14,6 +14,7 @@ Model *create_model(int num_users, int num_movies, int num_factors,
   model->num_factors = num_factors;
   model->learning_rate = learning_rate;
   model->regularization = regularization;
+  model->global_mean = 0.0f;
 
   model->user_features = (float **)malloc(num_users * sizeof(float *));
   for (int i = 0; i < num_users; i++) {
@@ -24,6 +25,9 @@ Model *create_model(int num_users, int num_movies, int num_factors,
   for (int i = 0; i < num_movies; i++) {
     model->movie_features[i] = (float *)malloc(num_factors * sizeof(float));
   }
+
+  model->user_bias = (float *)calloc(num_users, sizeof(float));
+  model->movie_bias = (float *)calloc(num_movies, sizeof(float));
 
   return model;
 }
@@ -39,6 +43,9 @@ void free_model(Model *model) {
       free(model->movie_features[i]);
     }
     free(model->movie_features);
+
+    free(model->user_bias);
+    free(model->movie_bias);
 
     free(model);
   }
@@ -67,9 +74,15 @@ void save_model(const char *filename, Model *model) {
             strerror(errno));
     return;
   }
+
   fwrite(&model->num_users, sizeof(int), 1, f);
   fwrite(&model->num_movies, sizeof(int), 1, f);
   fwrite(&model->num_factors, sizeof(int), 1, f);
+
+  fwrite(&model->global_mean, sizeof(float), 1, f);
+  fwrite(model->user_bias, sizeof(float), model->num_users, f);
+  fwrite(model->movie_bias, sizeof(float), model->num_movies, f);
+
   for (int i = 0; i < model->num_users; i++) {
     fwrite(model->user_features[i], sizeof(float), model->num_factors, f);
   }
@@ -112,8 +125,36 @@ Model *load_model(const char *filename) {
     return NULL;
   }
 
-  model->learning_rate = 0.005f;
-  model->regularization = 0.02f;
+  model->learning_rate = 0.001f;
+  model->regularization = 0.01f;
+
+  if (fread(&model->global_mean, sizeof(float), 1, f) != 1) {
+    fprintf(stderr, "Error reading global_mean from model file\n");
+    free(model);
+    fclose(f);
+    return NULL;
+  }
+
+  model->user_bias = (float *)malloc(model->num_users * sizeof(float));
+  if (fread(model->user_bias, sizeof(float), model->num_users, f) !=
+      (size_t)model->num_users) {
+    fprintf(stderr, "Error reading user_bias from model file\n");
+    free(model->user_bias);
+    free(model);
+    fclose(f);
+    return NULL;
+  }
+
+  model->movie_bias = (float *)malloc(model->num_movies * sizeof(float));
+  if (fread(model->movie_bias, sizeof(float), model->num_movies, f) !=
+      (size_t)model->num_movies) {
+    fprintf(stderr, "Error reading movie_bias from model file\n");
+    free(model->user_bias);
+    free(model->movie_bias);
+    free(model);
+    fclose(f);
+    return NULL;
+  }
 
   model->user_features = (float **)malloc(model->num_users * sizeof(float *));
   for (int i = 0; i < model->num_users; i++) {
@@ -126,6 +167,8 @@ Model *load_model(const char *filename) {
         free(model->user_features[j]);
       }
       free(model->user_features);
+      free(model->user_bias);
+      free(model->movie_bias);
       free(model);
       fclose(f);
       return NULL;
@@ -147,6 +190,8 @@ Model *load_model(const char *filename) {
         free(model->movie_features[j]);
       }
       free(model->movie_features);
+      free(model->user_bias);
+      free(model->movie_bias);
       free(model);
       fclose(f);
       return NULL;
@@ -155,4 +200,12 @@ Model *load_model(const char *filename) {
 
   fclose(f);
   return model;
+}
+
+void compute_global_mean(Model *model, Dataset *dataset) {
+  double sum = 0.0;
+  for (int i = 0; i < dataset->num_ratings; i++) {
+    sum += dataset->ratings[i].rating;
+  }
+  model->global_mean = sum / dataset->num_ratings;
 }

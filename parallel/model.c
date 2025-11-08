@@ -11,6 +11,7 @@ Model *create_model(int num_users, int num_movies, int num_factors,
   model->num_factors = num_factors;
   model->learning_rate = learning_rate;
   model->regularization = regularization;
+  model->global_mean = 0.0f;
 
   model->user_features = (float **)malloc(num_users * sizeof(float *));
   for (int i = 0; i < num_users; i++) {
@@ -21,6 +22,9 @@ Model *create_model(int num_users, int num_movies, int num_factors,
   for (int i = 0; i < num_movies; i++) {
     model->movie_features[i] = (float *)malloc(num_factors * sizeof(float));
   }
+
+  model->user_bias = (float *)calloc(num_users, sizeof(float));
+  model->movie_bias = (float *)calloc(num_movies, sizeof(float));
 
   return model;
 }
@@ -36,6 +40,9 @@ void free_model(Model *model) {
       free(model->movie_features[i]);
     }
     free(model->movie_features);
+
+    free(model->user_bias);
+    free(model->movie_bias);
 
     free(model);
   }
@@ -55,4 +62,12 @@ void initialize_model(Model *model, int rank) {
       model->movie_features[i][j] = ((float)rand_r(&seed) / RAND_MAX) * 0.1;
     }
   }
+}
+
+void compute_global_mean(Model *model, Dataset *dataset) {
+  double sum = 0.0;
+  for (int i = 0; i < dataset->num_ratings; i++) {
+    sum += dataset->ratings[i].rating;
+  }
+  model->global_mean = sum / dataset->num_ratings;
 }

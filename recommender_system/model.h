@@ -9,5 +9,6 @@ void free_model(Model *model);
 void initialize_model(Model *model, int rank);
 void save_model(const char *filename, Model *model);
 Model *load_model(const char *filename);
+void compute_global_mean(Model *model, Dataset *dataset);
 
 #endif

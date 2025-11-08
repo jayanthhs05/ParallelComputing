@@ -27,8 +27,14 @@ int main(int argc, char **argv) {
 
   Model *model = create_model(dataset->num_users, dataset->num_movies,
                               NUM_FACTORS, LEARNING_RATE, REGULARIZATION);
+
+  compute_global_mean(model, train_data);
+  printf("Global mean rating: %.4f\n", model->global_mean);
+
   initialize_model(model);
 
+  printf("Training model with %d factors for %d iterations\n", NUM_FACTORS,
+         NUM_ITERATIONS);
   train_model(model, train_data, NUM_ITERATIONS);
 
   float rmse = compute_rmse(model, test_data);

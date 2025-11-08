@@ -55,10 +55,17 @@ int main(int argc, char **argv) {
 
   Model *model = create_model(dataset->num_users, dataset->num_movies,
                               NUM_FACTORS, LEARNING_RATE, REGULARIZATION);
+
+  compute_global_mean(model, train_data);
+  if (rank == 0) {
+    printf("Global mean rating: %.4f\n", model->global_mean);
+  }
+
   initialize_model(model, rank);
 
   if (rank == 0) {
-    printf("Training model with %d factors\n", NUM_FACTORS);
+    printf("Training model with %d factors for %d iterations\n", NUM_FACTORS,
+           NUM_ITERATIONS);
   }
 
   train_model_parallel(model, train_data, NUM_ITERATIONS, rank, size);
